@@ -1,0 +1,41 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: bun-linux-x64
+            artifact: skillset-linux-x64
+          - os: ubuntu-latest
+            target: bun-linux-arm64
+            artifact: skillset-linux-arm64
+          - os: macos-13
+            target: bun-darwin-x64
+            artifact: skillset-darwin-x64
+          - os: macos-latest
+            target: bun-darwin-arm64
+            artifact: skillset-darwin-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun build src/cli.ts --compile --target=${{ matrix.target }} --outfile ${{ matrix.artifact }}
+      - run: shasum -a 256 ${{ matrix.artifact }} > ${{ matrix.artifact }}.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}*
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: release }
+      - uses: softprops/action-gh-release@v2
+        with: { files: release/**/* }
