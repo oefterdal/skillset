@@ -3,7 +3,15 @@ on:
   push:
     tags: ["v*"]
 jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    steps:
+      - run: gh release create "${GITHUB_REF_NAME}" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
   build:
+    needs: create-release
     strategy:
       matrix:
         include:
@@ -20,22 +28,13 @@ jobs:
             target: bun-darwin-arm64
             artifact: skillset-darwin-arm64
     runs-on: ${{ matrix.os }}
+    permissions: { contents: write }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun build src/cli.ts --compile --target=${{ matrix.target }} --outfile ${{ matrix.artifact }}
       - run: shasum -a 256 ${{ matrix.artifact }} > ${{ matrix.artifact }}.sha256
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          path: ${{ matrix.artifact }}*
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions: { contents: write }
-    steps:
-      - uses: actions/download-artifact@v4
-        with: { path: release }
-      - uses: softprops/action-gh-release@v2
-        with: { files: release/**/* }
+      - run: gh release upload "${GITHUB_REF_NAME}" "${{ matrix.artifact }}" "${{ matrix.artifact }}.sha256"
+        env:
+          GH_TOKEN: ${{ github.token }}
