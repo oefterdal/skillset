@@ -6,6 +6,7 @@ import { chooseAgents } from "./agent";
 import { loadLock } from "./lock";
 import { effectiveSkills, loadManifest, parseManifest } from "./manifest";
 import { run } from "./run";
+import { selfUpdate } from "./self-update";
 import {
   assertLockMatches,
   commitLock,
@@ -20,7 +21,7 @@ function manifestText(manifest: ReturnType<typeof parseManifest>): string {
 }
 function usage(): void {
   console.log(
-    `skillset ${VERSION}\n\nCommands:\n  add <source> --skill <name> [--ref <ref>] [--agent <id>...] [--copy] [--yes]\n  install\n  update\n\nSkillset resolves and verifies sources, then delegates installation to pinned npx skills.`,
+    `skillset ${VERSION}\n\nCommands:\n  add <source> --skill <name> [--ref <ref>] [--agent <id>...] [--copy] [--yes]\n  install\n  update\n  self-update\n\nSkillset resolves and verifies sources, then delegates installation to pinned npx skills.`,
   );
 }
 function option(args: string[], name: string): string | undefined {
@@ -42,6 +43,17 @@ async function main(): Promise<void> {
   const manifestPath = join(project, "skillset.yaml");
   const lockPath = join(project, "skillset.lock");
   const command = args[0];
+  if (command === "self-update") {
+    if (args.includes("--help") || args.includes("-h")) return usage();
+    const updated = await selfUpdate(VERSION, process.execPath);
+    if (updated === "current")
+      console.log(`Skillset v${VERSION} is already up to date.`);
+    else
+      console.log(
+        `✓ Downloaded and verified\n✓ Updated Skillset to ${updated}`,
+      );
+    return;
+  }
   if (command === "add") {
     const source = args[1],
       skill = option(args, "--skill");

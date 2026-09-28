@@ -7,6 +7,13 @@ import { parseLock, sortLock, writeLockAtomic } from "../src/lock";
 import { effectiveSkills, parseManifest } from "../src/manifest";
 import { run } from "../src/run";
 import {
+  compareVersions,
+  type Fetcher,
+  latestRelease,
+  platformAsset,
+  selfUpdate,
+} from "../src/self-update";
+import {
   assertLockMatches,
   commitLock,
   resolveEntry,
@@ -191,5 +198,50 @@ describe("source resolution and updates", () => {
       "skillset.lock",
       "skillset.yaml",
     ]);
+  });
+});
+
+describe("self update", () => {
+  test("compares semantic versions and selects platform assets", () => {
+    expect(compareVersions("v1.10.0", "1.2.0")).toBeGreaterThan(0);
+    expect(compareVersions("1.2.0", "v1.2.0")).toBe(0);
+    expect(platformAsset("darwin", "arm64")).toBe("skillset-darwin-arm64");
+    expect(() => platformAsset("win32", "x64")).toThrow("unsupported");
+  });
+  test("does not replace executable when checksum mismatches", async () => {
+    const root = await project();
+    const executable = join(root, "skillset");
+    await writeFile(executable, "old");
+    const fetcher = async (url: string) =>
+      new Response(
+        url.includes("releases/latest")
+          ? JSON.stringify({
+              tag_name: "v0.2.0",
+              assets: [
+                { name: "skillset-linux-x64", browser_download_url: "binary" },
+                {
+                  name: "skillset-linux-x64.sha256",
+                  browser_download_url: "checksum",
+                },
+              ],
+            })
+          : url === "binary"
+            ? "new"
+            : `${"0".repeat(64)}  skillset-linux-x64`,
+        { status: 200 },
+      );
+    await expect(
+      selfUpdate("0.1.0", executable, fetcher as unknown as Fetcher),
+    ).rejects.toThrow("checksum verification failed");
+    expect(await readFile(executable, "utf8")).toBe("old");
+  });
+  test("parses release metadata", async () => {
+    const release = await latestRelease(
+      (async () =>
+        new Response(
+          JSON.stringify({ tag_name: "v1.2.3", assets: [] }),
+        )) as unknown as Fetcher,
+    );
+    expect(release.tag).toBe("v1.2.3");
   });
 });
