@@ -4,7 +4,7 @@ on:
     tags: ["v*"]
 jobs:
   create-release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions: { contents: write }
     steps:
       - run: gh release create "${GITHUB_REF_NAME}" --generate-notes
@@ -15,10 +15,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             target: bun-linux-x64
             artifact: skillset-linux-x64
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             target: bun-linux-arm64
             artifact: skillset-linux-arm64
           - os: macos-13
